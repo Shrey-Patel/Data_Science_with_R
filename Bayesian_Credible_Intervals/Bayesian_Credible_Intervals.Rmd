@@ -1,0 +1,256 @@
+---
+title: "Bayesian Credible Intervals using R"
+author: "Shrey Patel"
+date: "10/13/2021"
+output:
+  pdf_document:
+    LaTeX_engine : pdfLaTeX
+    number_sections: True
+  html_document: 
+    number_sections: True
+    toc: true
+  prettydoc::html_pretty:
+    theme: tactile
+    number_sections: True
+    toc: true
+includes:
+      in_header: "MyPreamble.tex"
+bibliography: references.bib
+nocite: '@*'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(ggridges)
+library(bayestestR)
+library(dplyr)
+library(ggplot2)
+library(prettydoc)
+```
+
+# Introduction
+
+Bayesian inference is one of the popular methods of statistical inference. In Bayesian inference, a *Bayesian Credible Interval (CI)* is used to communicate the uncertainty associated with the random variables we are estimating. Before moving forward, it is essential to understand the basic differences between the frequentist and the Bayesian approach. Here are some of the main differences:
+
+a. Unlike the frequentist approach to statistical inference, where the parameters are treated as having fixed values, in Bayesian inference, the parameters are random variables. 
+b. While, the probability in the frequentist inference is defined as *a proportion of outcomes* (for example, dice roll => P(6) = 1/6), in Bayesian Inference, the probability is defined as *a degree of belief* (for example, 50% chance that it is going to rain today).
+c. Frequentist method makes predictions using only the data from current experiment. Whereas, Bayesian probability accounts for some *prior* probability- meaning, we have some 'past' knowledge of similar experiments which we will combine with the current experiment data to draw conclusions.
+
+
+# Background
+
+## Prerequisites
+
+Required:
+
+- Basic Probability Theory, refer <https://seeing-theory.brown.edu/basic-probability/index.html#section1>
+- Compound Probability, refer <https://seeing-theory.brown.edu/compound-probability/index.html>
+- Frequentist-style of statistical inference, refer <https://www.austincc.edu/mparker/stat/nov04/talk_nov04.pdf>
+
+Desired:
+
+- Basic R syntax, refer <http://chianti.ucsd.edu/~rsaito/ENTRY1/WEB_RS3/PDF/ENG/Texts/R_Stats_eng1_3.pdf>
+
+## Bayes' Theorem
+
+```{r, echo=FALSE, out.width="200%", out.width= "25%", out.width= "25%", out.extra='style="float:right"'}
+knitr::include_graphics("prior_posterior_evidence.jpg")
+```
+
+Bayes' theorem lets us calculate the probability of an outcome occurring given that an outcome has already occurred. Using Bayes' theorem, we can update the predicted probabilities (our *belief*) of an event by absorbing new information. This new information being absorbed is in the form of a *prior* probability distribution, which is then used to generate a *posterior* probability distribution. It is important to note that the probabilities used in the Bayes' theorem are probability distributions and not a single  number. Mathematically, we define Bayes' theorem like this:
+
+$$
+\begin{equation}
+\label{eq:bayes}
+P(\theta|\textbf{D}) = P(\theta ) \frac{P(\textbf{D} |\theta)}{P(\textbf{D})},
+\end{equation}
+$$
+
+- **$\theta$** - *Parameter*
+- **$\textbf{D}$** - *Data* (evidence)
+- **$P(\theta|\textbf{D})$** - *Posterior* distribution: It reflects our knowledge about the parameter given the data we have. The posterior probability is what we are interested in.
+- **$P(\theta )$** - *Prior* distribution: What we know about the parameter before seeing any data.
+- **$P(\textbf{D} |\theta)$** - *Likelihood*: How likely the data is given the parameter.
+- **$P(\textbf{D})$** - *Scaling factor*: How likely the data is regardless of the parameter.
+
+
+## Bayesian Inference
+
+```{r, echo=FALSE, out.width="200%", out.width= "75%", out.width= "75%"}
+knitr::include_graphics("Bayesian-Inference-for-Data-Science.jpg")
+```
+
+The above process can be understood with the following example.
+
+*Problem*: What is the probability of tossing heads with a coin, if we observed 3 heads in 10 tosses?
+*Solution*: 
+
+- We define *data (D)* as a vector of 1s and 0s, where 1 represents heads and 0 represents tails.
+- We begin with a belief that each outcome is equally likely. Hence, we set our *prior* distribution as a `` Beta(1,1) `` distribution (which is also a uniform distribution).
+- The code below uses `` prop_model() `` function that takes in the *data* and the `` beta `` distribution parameters (`` a `` and `` b ``), calculates the *likelihood*, returns 10,000 samples from the *posterior* distribution, and displays a proportion graph. After each toss/iteration, the old *posterior* becomes the new *prior*. [-@prop_model]
+
+```{r, include=FALSE}
+#The prop_model function - Rasmus Bååth R code
+
+# This function takes a number of successes and failuers coded as a TRUE/FALSE
+# or 0/1 vector. This should be given as the data argument.
+# The result is a visualization of the how a Beta-Binomial
+# model gradualy learns the underlying proportion of successes 
+# using this data. The function also returns a sample from the
+# posterior distribution that can be further manipulated and inspected.
+# The default prior is a Beta(1,1) distribution, but this can be set using the
+# prior_prop argument.
+
+# Make sure the packages tidyverse and ggridges are installed, otherwise run:
+# install.packages(c("tidyverse", "ggridges"))
+
+# Example usage:
+# data <- c(TRUE, FALSE, TRUE, TRUE, FALSE, TRUE, TRUE)
+# prop_model(data)
+prop_model <- function(data = c(), prior_prop = c(1, 1), n_draws = 10000,
+                       gr_name="Proportion graph") {
+  #library(tidyverse)
+  
+  data <- as.logical(data)
+  # data_indices decides what densities to plot between the prior and the posterior
+  # For 20 datapoints and less we're plotting all of them.
+  data_indices <- round(seq(0, length(data), length.out = min(length(data) + 1, 40)))
+  
+  # dens_curves will be a data frame with the x & y coordinates for the 
+  # denities to plot where x = proportion_success and y = probability
+  proportion_success <- c(0, seq(0, 1, length.out = 100), 1)
+  dens_curves <- map_dfr(data_indices, function(i) {
+    value <- ifelse(i == 0, "Prior", ifelse(data[i], "Success", "Failure"))
+    label <- paste0("n=", i)
+    probability <- dbeta(proportion_success,
+                         prior_prop[1] + sum(data[seq_len(i)]),
+                         prior_prop[2] + sum(!data[seq_len(i)]))
+    probability <- probability / max(probability)
+    data_frame(value, label, proportion_success, probability)
+  })
+  # Turning label and value into factors with the right ordering for the plot
+  dens_curves$label <- fct_rev(factor(dens_curves$label, levels =  paste0("n=", data_indices )))
+  dens_curves$value <- factor(dens_curves$value, levels = c("Prior", "Success", "Failure"))
+  
+  graph_label <- paste("Prior likelihood distribution Beta(a =", 
+                       as.character(prior_prop[1]),", b =",
+                       as.character(prior_prop[2]),")") 
+  
+  p <- ggplot(dens_curves, aes(x = proportion_success, y = label,
+                               height = probability, fill = value)) +
+    ggridges::geom_density_ridges(stat="identity", color = "white", alpha = 0.8,
+                                  panel_scaling = TRUE, size = 1) +
+    scale_y_discrete("", expand = c(0.01, 0)) +
+    scale_x_continuous("Proportion of success") +
+    scale_fill_manual(values = hcl(120 * 2:0 + 15, 100, 65), name = "", drop = FALSE,
+                      labels =  c("Prior   ", "Success   ", "Failure   ")) +
+    ggtitle(paste0(gr_name, ": ", sum(data),  " successes, ", sum(!data), " failures"),
+            subtitle = graph_label) +
+    labs(caption = "based on Rasmus Bååth R code") +
+    theme_light() +
+    theme(legend.position = "top")
+  print(p)
+  
+  # Returning a sample from the posterior distribution that can be further 
+  # manipulated and inspected
+  posterior_sample <- rbeta(n_draws, prior_prop[1] + sum(data), prior_prop[2] + sum(!data))
+  invisible(posterior_sample)
+}
+```
+
+
+```{r, echo=TRUE}
+# Here is how the posterior probability changes with each new reading
+
+data <- c( 1, 0, 0, 0, 1, 0, 0, 0, 0, 1 )
+posterior = prop_model( data )
+```
+
+
+# Credible Interval (CI)
+
+Using the posterior distribution we found using Bayesian inference, we now calculate Bayesian Credible Interval (CI). An $\textbf{x%}$ Credible Interval is such an interval that the probability that the parameter falls inside it is $\textbf{x%}$. For example, 89% credible interval contains 89% of the probable values. The wider the interval, the larger the uncertainty in the estimation. Two popular choices for CIs are 89% and 95%. However, it is recommended to use at least 10,000 posterior samples in order to precisely compute 95% CI. Any choice of CI can be used based on our needs, but it must be justifiable.
+
+The below pictures illustrate how credible intervals are constructed. Imagine a horizontal line descending down through the distribution. As it descends, the two points at which it intersects become the ends of the interval. The interval keeps getting larger as the line descends further. The line keeps descending until the probability mass inside the interval reaches a desired value. [-@bayes_datacamp] This is the case when the method chosen is **Highest Density Interval (HDI)**. However, when using the **Equal-Tailed Interval (ETI)**, the line keeps descending until the probability mass on each tail reaches a common desired value.  
+
+```{r, echo=FALSE, out.width="200%", out.width= "75%", out.width= "75%"}
+knitr::include_graphics("fig1.jpg")
+```
+```{r, echo=FALSE, out.width="200%", out.width= "75%", out.width= "75%"}
+knitr::include_graphics("fig2.jpg")
+```
+```{r, echo=FALSE, out.width="200%", out.width= "75%", out.width= "75%"}
+knitr::include_graphics("fig3.jpg")
+```
+
+The `` ci() `` function of the`` bayestestR `` library offers both ways to calculate CIs via `` method `` argument, which can be set to either `` hdi() `` or `` eti() `` . 
+
+
+# Example
+
+Circling back to the coin toss problem, let's compute 95% CIs Using the *posterior* distribution obtained from 10,000 posterior draws using both `` HDI `` and `` ETI `` methods.
+
+```{r, echo=TRUE}
+# Compute HDI and ETI (95% by default)
+( ci_hdi <- ci(posterior, method = "HDI") )
+( ci_eti <- ci(posterior, method = "ETI") )
+
+# Plot the distribution and add the limits of the two CIs
+posterior %>% 
+  estimate_density(extend=TRUE) %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_area(fill = "green", alpha = 0.4) +
+  theme_classic() +
+  # HDI in blue
+  geom_vline(xintercept = ci_hdi$CI_low, color = "royalblue", size = 3) +
+  geom_vline(xintercept = ci_hdi$CI_high, color = "royalblue", size = 3) +
+  # Quantile in red
+  geom_vline(xintercept = ci_eti$CI_low, color = "red", size = 1) +
+  geom_vline(xintercept = ci_eti$CI_high, color = "red", size = 1) +
+  # mean in black
+  geom_vline(xintercept=mean(posterior), linetype="F1")
+```
+
+The red lines represent credible interval calculated using `` ETI `` method. The left and right red lines indicate the 2.5th percentile and the 97.5th percentile, respectively. Whereas the blue lines represent the credible interval calculated using the `` HDI `` method.
+
+
+**Special case**: Using a symmetric posterior distribution.
+
+```{r, echo=TRUE}
+# Generate a normal distribution
+posterior <- distribution_normal(1000)
+
+# Compute HDI and ETI (95% by default)
+( ci_hdi <- ci(posterior, method = "HDI") )
+( ci_eti <- ci(posterior, method = "ETI") )
+
+# Plot the distribution and add the limits of the two CIs
+posterior %>% 
+  estimate_density(extend=TRUE) %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_area(fill = "green", alpha = 0.4) +
+  theme_classic() +
+  # HDI in blue
+  geom_vline(xintercept = ci_hdi$CI_low, color = "royalblue", size = 3) +
+  geom_vline(xintercept = ci_hdi$CI_high, color = "royalblue", size = 3) +
+  # Quantile in red
+  geom_vline(xintercept = ci_eti$CI_low, color = "red", size = 1) +
+  geom_vline(xintercept = ci_eti$CI_high, color = "red", size = 1) +
+  # mean in black
+  geom_vline(xintercept=mean(posterior), linetype="F1")
+```
+
+Interesting to see how both HDI and ETI credible intervals are almost same. 
+
+# Conclusion
+
+- Bayesian credible intervals and Confidence Intervals are two different ways of measuring uncertainty. Credible intervals captures the uncertainty in the location of the parameter values. Whereas, a confidence interval captures the uncertainty about the interval we have obtained. In Bayesian inference, the parameter is random, and hence, it is possible for it fall into an interval with some probability. In the frequentist world, the confidence interval is random while the parameter is fixed.
+
+- A symmetric posterior distribution yields similar credible intervals, if not identical, regardless of the CI method chosen.
+
+
+# References
+
+

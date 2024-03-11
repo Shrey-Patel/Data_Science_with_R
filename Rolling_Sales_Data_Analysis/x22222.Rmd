@@ -1,0 +1,106 @@
+---
+title: "Rolling Sales Data Analysis - Manhattan"
+author: "Shrey Patel"
+date: "12/15/2021"
+output:
+  pdf_document:
+    latex_engine : pdflatex
+    number_sections: True
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tibble)
+library(ggplot2)
+library(tidyverse)
+library(ggforce)
+library(dplyr)
+```
+
+```{r, include=FALSE}
+# excel file converted to csv and read
+sales <- read.csv("rollingsales_manhattan.csv", skip=5, header=FALSE)
+colnames(sales) <- c("borough", "neighborhood", "building_class_category", "tax_class_at_present", "block", "lot", "easement", 
+                    "building_class_at_present", "address", "apartment_number", "zipcode", "residential_units", "commercial_units", 
+                    "total_units", "land_sqft", "gross_sqft", "year_built", "tax_class_at_sale", "building_class_at_sale",
+                    "sale_price","sale_date")
+
+#View(sales)
+
+sales_data <- as_tibble(sales)
+
+# removing borough, easement, address, and apartment number columns
+sales_data <- sales_data %>% select(-c(borough,easement,address,apartment_number,gross_sqft))
+
+# converting land sq.feet, gross sq.feet, and sale price to numeric 
+sales_data$land_sqft = as.numeric(gsub(",", "", sales_data$land_sqft))
+sales_data$sale_price = as.numeric(gsub(",", "", sales_data$sale_price))
+
+summary(sales_data)
+
+# converting the character type variables and some numeric type variables to factors
+sales_data$neighborhood <- factor(sales_data$neighborhood)
+sales_data$building_class_category <- factor(sales_data$building_class_category)
+sales_data$tax_class_at_present <- factor(sales_data$tax_class_at_present)
+#sales_data$block <- factor(sales_data$block)
+#sales_data$lot <- factor(sales_data$lot)
+sales_data$building_class_at_present <- factor(sales_data$building_class_at_present)
+sales_data$zipcode <- factor(sales_data$zipcode)
+sales_data$residential_units <- factor(sales_data$residential_units)
+sales_data$commercial_units <- factor(sales_data$commercial_units)
+sales_data$total_units <- factor(sales_data$total_units)
+sales_data$year_built <- factor(sales_data$year_built)
+sales_data$tax_class_at_sale <- factor(sales_data$tax_class_at_sale)
+sales_data$building_class_at_sale <- factor(sales_data$building_class_at_sale)
+
+# converting the date column to date type
+sales_data$sale_date <- as.Date(sales_data$sale_date, "%m/%d/%Y")
+```
+
+# Abstract
+
+In this study, I have predicted the land square feet area for properties using a multinomial Logistic Regression classifier while considering features like: the neighborhood, the building class category, block, lot, tax class at sale, building class at sale, and sale price. This study was done to semi-impute (assign a range instead of an exact value) the missing data with respect to the land square feet variable. Post-analyses, I can conclude that the multinomial logistic regression classifier is better at predicting the land square feet area for large buildings and for those that fall under tax class #4.
+
+# Introduction
+
+Variables like land square feet area, gross square feet area, number of residential and commercial units, play a huge role in deciding whether a property is worth buying at a given price. Considering the amount of missing data in the sales data set, it is essential to impute or at least semi-impute the missing land square feet area information. In this study, I have performed exploratory data analysis to answer the following questions:
+
+- What is the distribution of sale prices for each tax class?
+- What is the distribution of number of sales over time for each tax class? Identify months where the sales peaked or dipped.
+- What is the trend with respect to the sale price and the number of sale over time for each tax class?
+
+Finally, I performed a predictive analysis to predict a range of land square feet values that a property might fall under. 
+
+# Data
+
+The data set used in this study is publicly available on the [NYC department of finance](https://www1.nyc.gov/site/finance/taxes/property-rolling-sales-data.page). The data contains rolling sales data for a time range between December 2020 and November 2021. There are a total of 20,853 observations and 21 features. For predictive analysis, I created a new target variable, Area from the land square feet variable. The target variable takes four values based on the conditions below:
+
+# Introduction
+
+Variables like land square feet area, gross square feet area, number of residential and commercial units, play a huge role in deciding whether a property is worth buying at a given price. Considering the amount of missing data in the sales data set, it is essential to impute or at least semi-impute the missing land square feet area information. In this study, I have performed exploratory data analysis to answer the following questions:
+
+- What is the distribution of sale prices for each tax class?
+- What is the distribution of number of sales over time for each tax class? Identify months where the sales peaked or dipped.
+- What is the trend with respect to the sale price and the number of sale over time for each tax class?
+
+Finally, I performed predictive analysis to predict a range of land square feet values that a property might fall under. 
+
+# Data
+
+The data set used in this study is publicly available on the [NYC department of finance](https://www1.nyc.gov/site/finance/taxes/property-rolling-sales-data.page). The data contains rolling sales data for a time range between December 2020 and November 2021. There are a total of 20,853 observations and 21 features. For predictive analysis, I created a new target variable, Area from the land square feet variable. The target variable takes four values based on the conditions below:
+
+```{r, echo=FALSE, out.width="200%", out.width= "25%", out.width= "25%", out.extra='style="float:right"'}
+knitr::include_graphics("sales_vs_date.png")
+```
+
+The four values represent the inter-quantile ranges. Hence, the labels are well-balanced.
+
+# Analyses
+
+## Pre-processing the Data
+
+The four values represent the inter-quantile ranges. Hence, the labels are well-balanced.
+
+# Analyses
+
+## Pre-processing the Data

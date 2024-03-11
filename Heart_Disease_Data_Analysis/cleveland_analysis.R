@@ -1,0 +1,132 @@
+library(tibble)
+library(ggplot2)
+library(tidyverse)
+
+#### split violin func #####
+GeomSplitViolin <- ggproto("GeomSplitViolin", GeomViolin, 
+                           draw_group = function(self, data, ..., draw_quantiles = NULL) {
+                             data <- transform(data, xminv = x - violinwidth * (x - xmin), xmaxv = x + violinwidth * (xmax - x))
+                             grp <- data[1, "group"]
+                             newdata <- plyr::arrange(transform(data, x = if (grp %% 2 == 1) xminv else xmaxv), if (grp %% 2 == 1) y else -y)
+                             newdata <- rbind(newdata[1, ], newdata, newdata[nrow(newdata), ], newdata[1, ])
+                             newdata[c(1, nrow(newdata) - 1, nrow(newdata)), "x"] <- round(newdata[1, "x"])
+                             
+                             if (length(draw_quantiles) > 0 & !scales::zero_range(range(data$y))) {
+                               stopifnot(all(draw_quantiles >= 0), all(draw_quantiles <=
+                                                                         1))
+                               quantiles <- ggplot2:::create_quantile_segment_frame(data, draw_quantiles)
+                               aesthetics <- data[rep(1, nrow(quantiles)), setdiff(names(data), c("x", "y")), drop = FALSE]
+                               aesthetics$alpha <- rep(1, nrow(quantiles))
+                               both <- cbind(quantiles, aesthetics)
+                               quantile_grob <- GeomPath$draw_panel(both, ...)
+                               ggplot2:::ggname("geom_split_violin", grid::grobTree(GeomPolygon$draw_panel(newdata, ...), quantile_grob))
+                             }
+                             else {
+                               ggplot2:::ggname("geom_split_violin", GeomPolygon$draw_panel(newdata, ...))
+                             }
+                           })
+
+geom_split_violin <- function(mapping = NULL, data = NULL, stat = "ydensity", position = "identity", ..., 
+                              draw_quantiles = NULL, trim = TRUE, scale = "area", na.rm = FALSE, 
+                              show.legend = NA, inherit.aes = TRUE) {
+  layer(data = data, mapping = mapping, stat = stat, geom = GeomSplitViolin, 
+        position = position, show.legend = show.legend, inherit.aes = inherit.aes, 
+        params = list(trim = trim, scale = scale, draw_quantiles = draw_quantiles, na.rm = na.rm, ...))
+}
+
+
+
+##### Preprocessing #####
+
+# loading the data set
+clev <- read.csv("processed.cleveland.data", header=FALSE)
+
+# renaming the columns
+colnames(clev) <- c("age", "sex", "cp", "trestbps", "chol", "fbs", "restecg", 
+                    "thalach", "exang", "oldpeak", "slope", "ca", "thal",
+                    "num")
+#View(clev)
+
+# converting data.frame to tibble
+library(tibble)
+clev_data <- as_tibble(clev)
+clev_data
+
+# converting ca and thal variables to float
+clev_data$ca <- as.numeric(clev_data$ca)
+clev_data$thal <- as.numeric(clev_data$thal)
+
+# adding outcome variable
+clev_data <- mutate(clev_data,
+                    outcome = (num!=0))
+
+# checking for missing values
+clev_data
+sapply(clev_data, function(x) sum(is.na(x)))
+
+# removing rows with missing values
+clev_data <- filter(clev_data, !is.na(clev_data$ca), !is.na(clev_data$thal))
+sapply(clev_data, function(x) sum(is.na(x)))
+clev_data
+#View(clev_data)
+
+# converting categorical variables to factors from numeric
+clev_data$sex <- factor(clev_data$sex, levels = c(0, 1),
+                        labels = c("Female", "Male"))
+clev_data$cp <- factor(clev_data$cp, levels = c(1, 2, 3, 4),
+                          labels = c("typical angina", "atypical angina", "non-anginal pain", "asymptomatic"))
+clev_data$fbs <- factor(clev_data$fbs, levels = c(0, 1),
+                         labels = c("fbs <= 120 mg/dl", "fbs > 120 mg/dl"))
+clev_data$restecg <- factor(clev_data$restecg, levels = c(0, 1, 2),
+                            labels = c("normal", 1, 2))
+clev_data$exang <- factor(clev_data$exang, levels = c(0, 1),
+                        labels = c("No", "Yes"))
+clev_data$slope <- factor(clev_data$slope, levels = c(1, 2, 3),
+                          labels = c("upsloping", "flat", "downsloping"))
+clev_data$ca <- as.factor(clev_data$ca)
+clev_data$thal <- factor(clev_data$thal, levels = c(3, 6, 7),
+                       labels = c("normal", "fixed defect", "reversible defect"))
+clev_data$num <- as.factor(clev_data$num)
+clev_data$outcome <- factor(clev_data$outcome, levels = c(FALSE, TRUE),
+                            labels = c(0, 1))
+
+clev_data
+
+summary(clev_data)
+str(clev_data)
+
+####### Analysis #######
+
+# violin plot, prevalence 
+ggplot(data = clev_data, mapping = aes(x = outcome, y = age, fill = sex)) +
+  geom_split_violin() +
+  stat_summary(fun.y=median, geom="point", color="black", size=2, shape=23) +
+  facet_wrap(~ fbs, nrow = 2) +
+  labs(x = "Diagnosis", y = "Age", shape = "median") +
+  ggtitle("Prevalence of heart disease spread across age groups (w/ fasting blood sugar data)") 
+
+# Inferences:
+# - regardless of the fasting blood sugar, if the subject is a female between 55 and 65, 
+#       there is a higher chance that the person has a heart disease.
+# - same goes for males between age 55 and 60.
+# - healthier population in terms of blood sugar levels and heart conditions 
+#       look to be evenly distributed across age groups.
+# - Regardless of the gender, people with abnormal blood sugar levels have higher chances of 
+#       having a heart disease b/w age 55 and 60
+# - One thing to note is that, this plot does not convey any information
+#       for a particular case when the subject is a female of age around 50 
+#       with abnormal fasting blood sugar levels as we don't have enough data for that particular region. -- uncertainty 
+# - In fact, this peak is due to an outlier in the data set that represents a female of age 43 with abnormal blood sugar levels.
+
+# ( filter(clev_data, clev_data$sex=="Female", clev_data$age<54, clev_data$fbs=="fbs > 120 mg/dl") )
+
+ggplot(data=clev_data, mapping=aes(x=age, fill=sex)) +
+  geom_density(alpha = 0.2) +
+  facet_wrap(~ num, nrow = 1) +
+  ggtitle("Prevalence of heart disease spread across age groups for male and female population of Cleveland")
+
+
+##### Predictive analysis #####
+
+
+

@@ -1,0 +1,61 @@
+---
+title: "Effective vs. Ineffective Visualizations: Examples"
+author: "Shrey Patel"
+date: "9/8/2021"
+output:
+  pdf_document:
+    includes:  
+      in_header: "float_header.tex"
+    number_sections: true
+  html_document: 
+    number_sections: true
+---
+
+# Effective Visualizations
+
+## Weather Spark
+
+[Weather Spark](https://WeatherSpark.com) provides climate reports for almost 150,000 cities worldwide. This website has some of the most insightful and attractive weather forecast visualizations. The figure below is one of the visualizations that describes the year-round weather of Boston.
+
+\begin{figure}
+  \includegraphics{Boston_weather.jpg}
+  \caption{Boston Weather}
+\end{figure}
+
+The [visualization](https://weatherspark.com/y/26197/Average-Weather-in-Boston-Massachusetts-United-States-Year-Round#Sections-BestTime) consists of five plots stacked from top to bottom. The first plot describes the average percentage of sky covered by clouds, the second plot describes the average amount of precipitation Boston receives throughout the year, the third plot describes the humidity in the atmosphere, the fourth plot describes the temperature, and the fifth plot provides insights on what would be the best time to visit Boston. The amount of information, the layout, the use of colors, and the *useful* minor details like highs and lows for each plot make this visualization easy and quick to interpret.
+
+## Earth's Atmosphere to Scale
+
+The following visualization was published on Visual Capitalist website in an [article](https://www.visualcapitalist.com/a-new-perspective-on-earths-atmosphere/) that sheds light on the fact that the habitable region of atmosphere is in actual only a small fraction of the total atmosphere. 
+
+\begin{figure}
+  \includegraphics{earth_atmosphere.jpg}
+  \caption{Earth's Atmosphere}
+\end{figure}
+
+The idea to scale down atmosphere to the size of Florida to provide an intuition regarding altitude is what makes this visualization effective. Also, details like recent space flights, Mt. Everest, and Mariana Trench make it further informative and aesthetically pleasing.
+
+
+# Ineffective Visualizations
+
+## COVID-19 Vaccination in India
+
+The following figure was published by the Indian government this week illustrating the pace of COVID-19 vaccination since the beginning of 2021.
+
+\begin{figure}
+  \includegraphics{India_vaccination.jpg}
+  \caption{Vaccination Trend in India}
+\end{figure}
+
+Although the numbers might look comforting, their depiction in the figure could be misleading. Instead of analyzing the days passed, it would be much more useful to analyze the trend in percentage of Indian population vaccinated. Considering the data is reliable, 70 Crore doses (700 Million) vaccinates only 350 million people which is a quarter of the total population. Hence, the visualization is quite ineffective due to its focus on a metric that means nothing in the bigger picture.
+
+## Rise in Physicians and Administrators
+
+The graph below went viral on Twitter two years ago for the dubious rise it depicts between 1992 and 1994.
+
+\begin{figure}
+  \includegraphics{physicians_administrators_growth.jpg}
+  \caption{Growth in Physicians and Administrators}
+\end{figure}
+
+Between 1992 and 1994, the number of administrators rose by a factor of 4. A sudden rise like that looks questionable. Additionally, analyzing percentage growth since 1970 makes little sense since each number on the plot is calculated based off of the numbers from 1970. A small data entry error in 1970 could invalidate the entire graph. The data being dependent on statistics from 1970 makes this visualization less reliable.
